@@ -15,7 +15,7 @@ def get_steer_matrix_left_lane_markings(shape: Tuple[int, int]) -> np.ndarray:
     """
 
     # TODO: implement your own solution here
-    steer_matrix_left = np.random.rand(*shape)
+    steer_matrix_left = np.repeat(np.arange(0, shape[0]), shape[1]).reshape(shape)
     # ---
     return steer_matrix_left
 
@@ -31,7 +31,7 @@ def get_steer_matrix_right_lane_markings(shape: Tuple[int, int]) -> np.ndarray:
     """
 
     # TODO: implement your own solution here
-    steer_matrix_right = np.random.rand(*shape)
+    steer_matrix_right = -np.repeat(np.arange(0, shape[0]), shape[1]).reshape(shape)
     # ---
     return steer_matrix_right
 
@@ -46,8 +46,38 @@ def detect_lane_markings(image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     h, w, _ = image.shape
 
-    # TODO: implement your own solution here
-    mask_left_edge = np.random.rand(h, w)
-    mask_right_edge = np.random.rand(h, w)
+    imghsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    sigma = 3
+    img_gaussian_filter = cv2.GaussianBlur(img,(0,0), sigma)
+    sobelx = cv2.Sobel(img_gaussian_filter,cv2.CV_64F,1,0)
+    sobely = cv2.Sobel(img_gaussian_filter,cv2.CV_64F,0,1)
+    Gmag = np.sqrt(sobelx*sobelx + sobely*sobely)
+    threshold = 40
+    mask_mag = (Gmag > threshold)
+
+    mask_sobelx_pos = (sobelx > 0)
+    mask_sobelx_neg = (sobelx < 0)
+    mask_sobely_pos = (sobely > 0)
+    mask_sobely_neg = (sobely < 0)
+
+    width = img.shape[1]
+    mask_left = np.ones(sobelx.shape)
+    mask_left[:,int(np.floor(width/2)):width + 1] = 0
+    mask_right = np.ones(sobelx.shape)
+    mask_right[:,0:int(np.floor(width/2))] = 0
+
+    white_lower_hsv = np.array([0, 0, 100])         # CHANGE ME
+    white_upper_hsv = np.array([255, 60, 255])   # CHANGE ME
+    yellow_lower_hsv = np.array([25, 100, 100])        # CHANGE ME
+    yellow_upper_hsv = np.array([30, 255, 255])  # CHANGE ME 
+
+    mask_white = cv2.inRange(imghsv, white_lower_hsv, white_upper_hsv)
+    mask_yellow = cv2.inRange(imghsv, yellow_lower_hsv, yellow_upper_hsv)
+
+    mask_left_edge = mask_left * mask_mag * mask_sobelx_neg * mask_sobely_neg * mask_yellow
+    mask_right_edge = mask_right * mask_mag * mask_sobelx_pos * mask_sobely_neg * mask_white
+    # mask_left_edge = mask_left * mask_mag * mask_sobelx_neg * mask_sobely_neg
+    # mask_right_edge = mask_right * mask_mag * mask_sobelx_pos * mask_sobely_neg
 
     return mask_left_edge, mask_right_edge
